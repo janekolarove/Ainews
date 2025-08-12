@@ -1,0 +1,41 @@
+name: Auto Content (RSS Summaries)
+
+on:
+  schedule:
+    - cron: "7 6,10,14 * * *"   # 3× denně (UTC) → pokrývá ráno/poledne/odpoledne v ČR
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install feedparser==6.0.11 beautifulsoup4==4.12.3 python-slugify==8.0.4
+
+      - name: Generate posts from RSS
+        env:
+          TZ: Europe/Prague
+        run: python scripts/rss_to_posts.py
+
+      - name: Commit & push new posts
+        run: |
+          git config user.name "ai-news-bot"
+          git config user.email "bot@ainews.run"
+          git add _posts/*.md || true
+          if git diff --cached --quiet; then
+            echo "No new posts."
+            exit 0
+          fi
+          git commit -m "auto: RSS summaries"
+          git push
